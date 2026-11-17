@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="MintGuard — verify a BSC NFT mint contract before you mint. Hybrid on-device (Gemini Nano) + cloud AI analysis."
+    />
+    <title>MintGuard — NFT Mint Verifier</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="site-header">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="34" height="34" fill="none">
+            <path
+              d="M12 2 20 5.5v5.6c0 5-3.4 9.4-8 10.9-4.6-1.5-8-5.9-8-10.9V5.5L12 2Z"
+              stroke="#34d399"
+              stroke-width="1.8"
+              fill="rgba(52,211,153,.12)"
+            />
+            <path
+              d="m8.5 12 2.4 2.4L15.7 9.5"
+              stroke="#34d399"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+        <div class="brand">
+          <h1>MintGuard</h1>
+          <p class="tagline">NFT Mint Verifier — check before you mint</p>
+        </div>
+        <span class="chain-badge">BSC · Chain 56</span>
+      </header>
+
+      <main>
+        <section class="hero">
+          <h2>Is this free mint safe?</h2>
+          <p>
+            Paste a BSC NFT contract address. MintGuard reads the contract on-chain,
+            checks whether its source is verified, and analyses the risk with hybrid
+            AI — on-device Gemini Nano first, cloud when needed.
+          </p>
+        </section>
+
+        <section class="verifier card">
+          <label for="address">Contract address (BSC)</label>
+          <div class="input-row">
+            <input
+              id="address"
+              type="text"
+              spellcheck="false"
+              autocomplete="off"
+              placeholder="0x…"
+            />
+            <button id="verifyBtn" type="button">Verify</button>
+          </div>
+          <p class="hint">Free to check. No wallet connection, no transaction, no signing.</p>
+          <div class="demo-row">
+            <span>Try a real contract:</span>
+            <button
+              type="button"
+              class="demo-btn"
+              data-address="0x5777c2f59c65003ddebb018517b09f7ba0691202"
+            >
+              PIXIU (verified)
+            </button>
+            <button
+              type="button"
+              class="demo-btn"
+              data-address="0x4EF929aF00cB93993c3D01834C4DA79200d31e32"
+            >
+              Pokechain (unverified)
+            </button>
+            <button
+              type="button"
+              class="demo-btn"
+              data-address="0x58e8f1b34B60687B36BCdc78e02a2fd443De71Ab"
+            >
+              PXIO (verified)
+            </button>
+          </div>
+          <div id="progress" class="progress hidden" role="status"></div>
+          <div id="error" class="error hidden" role="alert"></div>
+        </section>
+
+        <section id="results" class="results hidden" aria-live="polite"></section>
+
+        <section class="how card">
+          <h2>How it works</h2>
+          <ol>
+            <li>
+              <strong>On-chain facts.</strong> MintGuard reads the contract directly
+              from BSC (bytecode, owner, supply, name/symbol) and checks whether its
+              source is verified on Sourcify.
+            </li>
+            <li>
+              <strong>Deterministic checks.</strong> A transparent rule engine scores
+              the risk: unverified source, owner powers, dangerous functions.
+            </li>
+            <li>
+              <strong>Hybrid AI analysis.</strong> The facts are analysed by Gemini —
+              preferably on-device with Gemini Nano (Chrome Desktop 139+, fast and
+              private), falling back to the cloud model when on-device is unavailable.
+              No API key is shipped in the app; Firebase AI Logic handles the backend.
+            </li>
+          </ol>
+          <p class="note">
+            MintGuard is a risk-screening aid, not financial advice. Always do your own
+            research before minting.
+          </p>
+        </section>
+      </main>
+
+      <footer>
+        <p>Built for #BuildHybridAI 2026 · Firebase AI Logic · BSC Chain 56</p>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

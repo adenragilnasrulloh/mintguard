@@ -1,0 +1,1 @@
+{"dependencies":{"firebase":"^12.5.0"},"description":"MintGuard — NFT Mint Verifier. Hybrid on-device (Gemini Nano) + cloud AI verification of BSC NFT contracts.","devDependencies":{"vite":"^6.3.5"},"name":"mintguard","private":true,"scripts":{"build":"vite build","dev":"vite","preview":"vite preview"},"type":"module","version":"0.1.0"}
