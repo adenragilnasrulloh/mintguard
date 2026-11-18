@@ -34,6 +34,45 @@ function esc(s) {
   })[c]);
 }
 
+function aiErrorText(err) {
+  const msg = err?.message || "";
+  // The cloud 403 carries a long billing URL; show the human meaning.
+  if (/free tier is not available/i.test(msg)) {
+    return "Cloud AI unavailable (this project has no billing) — on-device Nano is the free path";
+  }
+  return msg.length > 160 ? `${msg.slice(0, 157)}…` : msg;
+}
+
+// Probe the raw Prompt API for a status line only — inference itself still
+// goes through Firebase AI Logic (the hackathon requirement). This tells
+// the user (and judges) whether Nano is ready, downloading, or unavailable.
+async function probeNanoStatus() {
+  const el = $("nanoStatus");
+  if (!el) return;
+  try {
+    const LM = window.LanguageModel;
+    if (!LM || typeof LM.availability !== "function") {
+      el.textContent = "On-device AI (Gemini Nano): not supported in this browser (needs Chrome 138+).";
+      return;
+    }
+    const raw = await LM.availability();
+    const state = typeof raw === "string" ? raw : raw?.available ?? raw;
+    if (state === "available" || state === "readily") {
+      el.textContent = "On-device AI (Gemini Nano): ready on this browser.";
+    } else if (state === "downloading" || state === "downloadable" || state === "after-download") {
+      el.textContent =
+        "On-device AI (Gemini Nano): model downloading in the background — run Verify, then try again in a few minutes.";
+    } else {
+      el.textContent = `On-device AI (Gemini Nano): unavailable in this browser (${String(state)}).`;
+    }
+  } catch (err) {
+    el.textContent = "On-device AI (Gemini Nano): status unknown.";
+    console.warn("[MintGuard] Nano status probe failed:", err);
+  }
+}
+
+probeNanoStatus();
+
 function renderResults({ facts, checks, riskScore, verdict }, ai, aiError) {
   const finalVerdict = ai?.verdict || verdict;
   const finalScore = ai?.riskScore ?? riskScore;
@@ -61,7 +100,7 @@ function renderResults({ facts, checks, riskScore, verdict }, ai, aiError) {
       }
       <p class="backend">Analysed with ${esc(ai.backend)} · deterministic score ${esc(riskScore)}/100</p>`
           : `<p class="ai-skip">AI analysis unavailable (${
-              esc(aiError?.message || (firebaseConfigured ? "model error" : "Firebase not configured"))
+              esc(aiError ? aiErrorText(aiError) : firebaseConfigured ? "model error" : "Firebase not configured")
             }) — showing deterministic checks only. See README.md to enable AI.</p>`
       }
       <h3>On-chain checks</h3>

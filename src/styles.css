@@ -147,6 +147,12 @@ button {
   margin: 10px 0 0;
 }
 
+.nano-status {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin: 6px 0 0;
+}
+
 .demo-row {
   display: flex;
   flex-wrap: wrap;
