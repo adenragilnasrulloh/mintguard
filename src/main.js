@@ -34,7 +34,7 @@ function esc(s) {
   })[c]);
 }
 
-function renderResults({ facts, checks, riskScore, verdict }, ai) {
+function renderResults({ facts, checks, riskScore, verdict }, ai, aiError) {
   const finalVerdict = ai?.verdict || verdict;
   const finalScore = ai?.riskScore ?? riskScore;
   const flags = ai?.redFlags || [];
@@ -61,7 +61,7 @@ function renderResults({ facts, checks, riskScore, verdict }, ai) {
       }
       <p class="backend">Analysed with ${esc(ai.backend)} · deterministic score ${esc(riskScore)}/100</p>`
           : `<p class="ai-skip">AI analysis unavailable (${
-              firebaseConfigured ? "model error" : "Firebase not configured"
+              esc(aiError?.message || (firebaseConfigured ? "model error" : "Firebase not configured"))
             }) — showing deterministic checks only. See README.md to enable AI.</p>`
       }
       <h3>On-chain checks</h3>
@@ -112,9 +112,10 @@ async function runVerify() {
 
     // Deterministic results render FIRST — an AI hang must never block them.
     setProgress("");
-    renderResults(result, null);
+    renderResults(result, null, null);
 
     let ai = null;
+    let aiError = null;
     if (aiAvailable()) {
       try {
         // Bound the whole AI step (device init + generateContent): the cloud
@@ -126,12 +127,13 @@ async function runVerify() {
           ),
         ]);
       } catch (err) {
+        aiError = err;
         console.warn("[MintGuard] AI analysis failed:", err);
       }
     }
 
     setProgress("");
-    renderResults(result, ai);
+    renderResults(result, ai, aiError);
   } catch (err) {
     console.error(err);
     setProgress("");
