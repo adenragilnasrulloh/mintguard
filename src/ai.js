@@ -61,8 +61,22 @@ function withTimeout(promise, ms, label) {
   ]);
 }
 
+function extractJson(text) {
+  // Gemini Nano often wraps JSON in ```json fences or adds prose around
+  // it; the cloud model returns clean JSON. Strip fences, then take the
+  // first {...} block.
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced ? fenced[1] : text;
+  const start = candidate.indexOf("{");
+  const end = candidate.lastIndexOf("}");
+  if (start === -1 || end <= start) {
+    throw new Error("AI returned no JSON object");
+  }
+  return JSON.parse(candidate.slice(start, end + 1));
+}
+
 function parseResult(result, riskScore, backend) {
-  const parsed = JSON.parse(result.response.text());
+  const parsed = extractJson(result.response.text());
   return {
     verdict: parsed.verdict,
     riskScore: typeof parsed.riskScore === "number" ? parsed.riskScore : riskScore,
@@ -105,6 +119,7 @@ export async function onVerify(facts, checks, riskScore, onProgress) {
   // Attempt 1: hybrid (Nano preferred). The SDK never falls back to the
   // cloud when the on-device call itself is slow — it only falls back when
   // the device model is unavailable — so bound it at 45s and retry below.
+  let hybridError = null;
   try {
     onProgress?.("Analyzing with hybrid AI…");
     const result = await withTimeout(
@@ -114,16 +129,27 @@ export async function onVerify(facts, checks, riskScore, onProgress) {
     );
     return parseResult(result, riskScore, detectBackend(result));
   } catch (err) {
+    hybridError = err;
     console.warn("[MintGuard] Hybrid AI failed/slow, retrying in the cloud:", err);
   }
 
   // Attempt 2: cloud-only. The same model answered in ~35s via the REST
-  // path, so give it 60s. Its error (if any) is the one reported on-page.
+  // path, so give it 60s. If the cloud fails too, report BOTH errors so
+  // the on-device reason is not hidden behind the cloud 403.
   onProgress?.("On-device is slow — retrying in the cloud…");
-  const result = await withTimeout(
-    cloudOnlyModel.generateContent(prompt),
-    60000,
-    "Cloud AI analysis",
-  );
-  return parseResult(result, riskScore, "cloud (Gemini 3.5 Flash-Lite)");
+  try {
+    const result = await withTimeout(
+      cloudOnlyModel.generateContent(prompt),
+      60000,
+      "Cloud AI analysis",
+    );
+    return parseResult(result, riskScore, "cloud (Gemini 3.5 Flash-Lite)");
+  } catch (cloudErr) {
+    const cloudMsg = /free tier is not available/i.test(cloudErr?.message || "")
+      ? "cloud unavailable (this project has no billing)"
+      : cloudErr?.message || "cloud error";
+    throw new Error(
+      `On-device failed: ${hybridError?.message || "unknown on-device error"}. Cloud: ${cloudMsg}.`,
+    );
+  }
 }

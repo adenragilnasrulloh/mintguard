@@ -36,6 +36,11 @@ function esc(s) {
 
 function aiErrorText(err) {
   const msg = err?.message || "";
+  // Combined on-device + cloud error: show it (it already has the short
+  // cloud wording), just cap the length.
+  if (msg.startsWith("On-device failed:")) {
+    return msg.length > 240 ? `${msg.slice(0, 237)}…` : msg;
+  }
   // The cloud 403 carries a long billing URL; show the human meaning.
   if (/free tier is not available/i.test(msg)) {
     return "Cloud AI unavailable (this project has no billing) — on-device Nano is the free path";
