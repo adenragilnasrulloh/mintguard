@@ -3,7 +3,7 @@
 // from the gesture, before generateContent. On-device is preferred; when it is
 // unavailable (non-Chrome browser, model not downloadable) the SDK falls back
 // to the cloud model automatically.
-import { verifierModel, firebaseConfigured } from "./firebase.js";
+import { verifierModel, cloudOnlyModel, firebaseConfigured } from "./firebase.js";
 
 export const aiAvailable = () => firebaseConfigured && Boolean(verifierModel);
 
@@ -61,6 +61,17 @@ function withTimeout(promise, ms, label) {
   ]);
 }
 
+function parseResult(result, riskScore, backend) {
+  const parsed = JSON.parse(result.response.text());
+  return {
+    verdict: parsed.verdict,
+    riskScore: typeof parsed.riskScore === "number" ? parsed.riskScore : riskScore,
+    redFlags: Array.isArray(parsed.redFlags) ? parsed.redFlags : [],
+    summary: parsed.summary || "",
+    backend,
+  };
+}
+
 export async function onVerify(facts, checks, riskScore, onProgress) {
   if (!aiAvailable()) {
     throw new Error(
@@ -89,16 +100,30 @@ export async function onVerify(facts, checks, riskScore, onProgress) {
     }
   }
 
-  onProgress?.("Analyzing with hybrid AI…");
-  const result = await verifierModel.generateContent(
-    buildPrompt(facts, checks, riskScore),
+  const prompt = buildPrompt(facts, checks, riskScore);
+
+  // Attempt 1: hybrid (Nano preferred). The SDK never falls back to the
+  // cloud when the on-device call itself is slow — it only falls back when
+  // the device model is unavailable — so bound it at 45s and retry below.
+  try {
+    onProgress?.("Analyzing with hybrid AI…");
+    const result = await withTimeout(
+      verifierModel.generateContent(prompt),
+      45000,
+      "Hybrid AI analysis",
+    );
+    return parseResult(result, riskScore, detectBackend(result));
+  } catch (err) {
+    console.warn("[MintGuard] Hybrid AI failed/slow, retrying in the cloud:", err);
+  }
+
+  // Attempt 2: cloud-only. The same model answered in ~35s via the REST
+  // path, so give it 60s. Its error (if any) is the one reported on-page.
+  onProgress?.("On-device is slow — retrying in the cloud…");
+  const result = await withTimeout(
+    cloudOnlyModel.generateContent(prompt),
+    60000,
+    "Cloud AI analysis",
   );
-  const parsed = JSON.parse(result.response.text());
-  return {
-    verdict: parsed.verdict,
-    riskScore: typeof parsed.riskScore === "number" ? parsed.riskScore : riskScore,
-    redFlags: Array.isArray(parsed.redFlags) ? parsed.redFlags : [],
-    summary: parsed.summary || "",
-    backend: detectBackend(result),
-  };
+  return parseResult(result, riskScore, "cloud (Gemini 3.5 Flash-Lite)");
 }

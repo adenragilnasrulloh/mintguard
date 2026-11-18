@@ -118,12 +118,14 @@ async function runVerify() {
     let aiError = null;
     if (aiAvailable()) {
       try {
-        // Bound the whole AI step (device init + generateContent): the cloud
-        // call alone takes ~35s, so 90s leaves room without hanging forever.
+        // Bound the whole AI step: device init (20s) + hybrid attempt (45s)
+        // + cloud-only retry (60s) = ~125s worst case, plus overhead.
+        // The cloud call alone takes ~35s, so 150s leaves room without
+        // hanging forever. Deterministic results are already on screen.
         ai = await Promise.race([
           onVerify(result.facts, result.checks, result.riskScore, setProgress),
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("AI analysis timed out after 90s")), 90000),
+            setTimeout(() => reject(new Error("AI analysis timed out after 150s")), 150000),
           ),
         ]);
       } catch (err) {

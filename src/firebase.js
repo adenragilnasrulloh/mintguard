@@ -25,6 +25,25 @@ if (!firebaseConfigured) {
 
 let app = null;
 let verifierModel = null;
+let cloudOnlyModel = null;
+
+// Cloud settings shared by the hybrid model and the cloud-only fallback.
+const inCloudParams = {
+  model: "gemini-3.5-flash-lite",
+  generationConfig: {
+    responseMimeType: "application/json",
+    responseSchema: {
+      type: "object",
+      properties: {
+        verdict: { type: "string", enum: ["SAFE", "CAUTION", "DANGEROUS"] },
+        riskScore: { type: "number" },
+        redFlags: { type: "array", items: { type: "string" } },
+        summary: { type: "string" },
+      },
+      required: ["verdict", "riskScore", "redFlags", "summary"],
+    },
+  },
+};
 
 if (firebaseConfigured) {
   app = initializeApp(firebaseConfig);
@@ -69,23 +88,20 @@ if (firebaseConfigured) {
   const ai = getAI(app, { backend: new GoogleAIBackend() });
   verifierModel = getGenerativeModel(ai, {
     mode: InferenceMode.PREFER_ON_DEVICE,
-    inCloudParams: {
-      model: "gemini-3.5-flash-lite",
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "object",
-          properties: {
-            verdict: { type: "string", enum: ["SAFE", "CAUTION", "DANGEROUS"] },
-            riskScore: { type: "number" },
-            redFlags: { type: "array", items: { type: "string" } },
-            summary: { type: "string" },
-          },
-          required: ["verdict", "riskScore", "redFlags", "summary"],
-        },
-      },
-    },
+    inCloudParams,
+  });
+
+  // Cloud-only fallback model. The SDK's PREFER_ON_DEVICE only falls back
+  // to the cloud when the device model is UNAVAILABLE — when the on-device
+  // call itself is slow, it waits forever (verified in the SDK source:
+  // callCloudOrDevice awaits onDeviceCall() with no fallback on
+  // throw/timeout). A second model with ONLY_IN_CLOUD gives onVerify an
+  // explicit cloud retry. Top-level `model` is ignored under a `mode`,
+  // so the settings must live in `inCloudParams` here too.
+  cloudOnlyModel = getGenerativeModel(ai, {
+    mode: InferenceMode.ONLY_IN_CLOUD,
+    inCloudParams,
   });
 }
 
-export { app, verifierModel };
+export { app, verifierModel, cloudOnlyModel };
