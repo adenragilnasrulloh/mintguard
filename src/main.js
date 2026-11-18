@@ -78,7 +78,7 @@ async function probeNanoStatus() {
 
 probeNanoStatus();
 
-function renderResults({ facts, checks, riskScore, verdict }, ai, aiError) {
+function renderResults({ facts, checks, riskScore, verdict }, ai, aiError, aiPending = false) {
   const finalVerdict = ai?.verdict || verdict;
   const finalScore = ai?.riskScore ?? riskScore;
   const flags = ai?.redFlags || [];
@@ -104,9 +104,11 @@ function renderResults({ facts, checks, riskScore, verdict }, ai, aiError) {
           : `<p class="no-flags">No red flags raised by the AI analysis.</p>`
       }
       <p class="backend">Analysed with ${esc(ai.backend)} · deterministic score ${esc(riskScore)}/100</p>`
-          : `<p class="ai-skip">AI analysis unavailable (${
-              esc(aiError ? aiErrorText(aiError) : firebaseConfigured ? "model error" : "Firebase not configured")
-            }) — showing deterministic checks only. See README.md to enable AI.</p>`
+          : aiPending
+            ? `<p class="ai-skip">AI analysis running on-device (Gemini Nano) — first inference can take a minute or two…</p>`
+            : `<p class="ai-skip">AI analysis unavailable (${
+                esc(aiError ? aiErrorText(aiError) : firebaseConfigured ? "model error" : "Firebase not configured")
+              }) — showing deterministic checks only. See README.md to enable AI.</p>`
       }
       <h3>On-chain checks</h3>
       <table class="checks">
@@ -156,20 +158,21 @@ async function runVerify() {
 
     // Deterministic results render FIRST — an AI hang must never block them.
     setProgress("");
-    renderResults(result, null, null);
+    renderResults(result, null, null, aiAvailable());
 
     let ai = null;
     let aiError = null;
     if (aiAvailable()) {
       try {
-        // Bound the whole AI step: device init (20s) + hybrid attempt (45s)
-        // + cloud-only retry (60s) = ~125s worst case, plus overhead.
-        // The cloud call alone takes ~35s, so 150s leaves room without
-        // hanging forever. Deterministic results are already on screen.
+        // Bound the whole AI step: device init (20s) + hybrid attempt (120s)
+        // + cloud-only retry (60s) = ~200s worst case, plus overhead.
+        // Nano's first inference is slow; the cloud call alone takes ~35s.
+        // Deterministic results are already on screen, so a long AI step
+        // only delays the AI panel, never the verdict.
         ai = await Promise.race([
           onVerify(result.facts, result.checks, result.riskScore, setProgress),
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("AI analysis timed out after 150s")), 150000),
+            setTimeout(() => reject(new Error("AI analysis timed out after 240s")), 240000),
           ),
         ]);
       } catch (err) {

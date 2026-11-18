@@ -23,10 +23,9 @@ function buildPrompt(facts, checks, riskScore) {
         : "none / not scannable"
     }`,
     `Deterministic risk score: ${riskScore}/100`,
-    "Checks:",
-    ...checks.map((c) => `- [${c.status}] ${c.label}: ${c.detail}`),
+    `Checks: ${checks.map((c) => `[${c.status}] ${c.label}`).join("; ")}`,
     "",
-    "Rules: SAFE means the contract looks standard and low-risk. CAUTION means there are material unknowns or owner powers. DANGEROUS means unverified source, no code, or owner powers that can rug users. Be specific in redFlags; summary max 3 sentences, plain English.",
+    "Rules: SAFE means the contract looks standard and low-risk. CAUTION means there are material unknowns or owner powers. DANGEROUS means unverified source, no code, or owner powers that can rug users. Be specific in redFlags; summary max 3 sentences, plain English. Return ONLY the JSON object, no markdown, no extra text.",
   ];
   return lines.join("\n");
 }
@@ -118,13 +117,14 @@ export async function onVerify(facts, checks, riskScore, onProgress) {
 
   // Attempt 1: hybrid (Nano preferred). The SDK never falls back to the
   // cloud when the on-device call itself is slow — it only falls back when
-  // the device model is unavailable — so bound it at 45s and retry below.
+  // the device model is unavailable. Nano's first inference on a machine
+  // is slow (warm-up + a small model generating JSON), so give it 120s.
   let hybridError = null;
   try {
     onProgress?.("Analyzing with hybrid AI…");
     const result = await withTimeout(
       verifierModel.generateContent(prompt),
-      45000,
+      120000,
       "Hybrid AI analysis",
     );
     return parseResult(result, riskScore, detectBackend(result));
