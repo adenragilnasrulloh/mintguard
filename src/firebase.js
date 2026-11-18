@@ -64,21 +64,25 @@ if (firebaseConfigured) {
 
   // AI Logic via the free Google AI backend (no Blaze plan required).
   // Hybrid inference: prefer on-device Gemini Nano, fall back to cloud.
+  // NOTE (SDK 12.19.0): under a hybrid `mode`, top-level `model` and
+  // `generationConfig` are IGNORED — cloud settings live in `inCloudParams`.
   const ai = getAI(app, { backend: new GoogleAIBackend() });
   verifierModel = getGenerativeModel(ai, {
     mode: InferenceMode.PREFER_ON_DEVICE,
-    model: "gemini-3.5-flash-lite",
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: "object",
-        properties: {
-          verdict: { type: "string", enum: ["SAFE", "CAUTION", "DANGEROUS"] },
-          riskScore: { type: "number" },
-          redFlags: { type: "array", items: { type: "string" } },
-          summary: { type: "string" },
+    inCloudParams: {
+      model: "gemini-3.5-flash-lite",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          properties: {
+            verdict: { type: "string", enum: ["SAFE", "CAUTION", "DANGEROUS"] },
+            riskScore: { type: "number" },
+            redFlags: { type: "array", items: { type: "string" } },
+            summary: { type: "string" },
+          },
+          required: ["verdict", "riskScore", "redFlags", "summary"],
         },
-        required: ["verdict", "riskScore", "redFlags", "summary"],
       },
     },
   });
