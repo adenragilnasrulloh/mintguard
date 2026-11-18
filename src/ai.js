@@ -52,6 +52,15 @@ function detectBackend(result) {
  * @param {(msg: string) => void} [onProgress]
  * @returns {Promise<{ verdict, riskScore, redFlags, summary, backend }>}
  */
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms),
+    ),
+  ]);
+}
+
 export async function onVerify(facts, checks, riskScore, onProgress) {
   if (!aiAvailable()) {
     throw new Error(
@@ -61,13 +70,23 @@ export async function onVerify(facts, checks, riskScore, onProgress) {
 
   onProgress?.("Preparing on-device model…");
   if (typeof verifierModel.initializeDeviceModel === "function") {
-    await verifierModel.initializeDeviceModel((progress) => {
-      const pct =
-        progress && typeof progress.progress === "number"
-          ? ` (${Math.round(progress.progress * 100)}%)`
-          : "";
-      onProgress?.(`Preparing on-device model${pct}…`);
-    });
+    // A stuck on-device download must never block the cloud fallback:
+    // give Nano 20s, then let generateContent fall back to the cloud model.
+    try {
+      await withTimeout(
+        verifierModel.initializeDeviceModel((progress) => {
+          const pct =
+            progress && typeof progress.progress === "number"
+              ? ` (${Math.round(progress.progress * 100)}%)`
+              : "";
+          onProgress?.(`Preparing on-device model${pct}…`);
+        }),
+        20000,
+        "On-device model init",
+      );
+    } catch (err) {
+      console.warn("[MintGuard] On-device model unavailable, using cloud:", err);
+    }
   }
 
   onProgress?.("Analyzing with hybrid AI…");

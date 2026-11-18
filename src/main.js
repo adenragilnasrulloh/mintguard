@@ -110,10 +110,21 @@ async function runVerify() {
     setProgress("Fetching on-chain data…");
     const result = await verifyContract(address, setProgress);
 
+    // Deterministic results render FIRST — an AI hang must never block them.
+    setProgress("");
+    renderResults(result, null);
+
     let ai = null;
     if (aiAvailable()) {
       try {
-        ai = await onVerify(result.facts, result.checks, result.riskScore, setProgress);
+        // Bound the whole AI step (device init + generateContent): the cloud
+        // call alone takes ~35s, so 90s leaves room without hanging forever.
+        ai = await Promise.race([
+          onVerify(result.facts, result.checks, result.riskScore, setProgress),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("AI analysis timed out after 90s")), 90000),
+          ),
+        ]);
       } catch (err) {
         console.warn("[MintGuard] AI analysis failed:", err);
       }
