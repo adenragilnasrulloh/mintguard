@@ -36,10 +36,14 @@ async function rpcCall(method, params) {
   let lastError = null;
   for (const url of RPC_URLS) {
     try {
+      // Bounded per endpoint: a hanging RPC must never block the
+      // deterministic results (spec: they are always shown, even if
+      // the Agent ID check fails). 15s per endpoint, ~30s worst case.
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+        signal: AbortSignal.timeout(15000),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
       const json = await res.json();

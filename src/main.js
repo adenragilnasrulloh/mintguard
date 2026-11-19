@@ -100,14 +100,16 @@ async function probeNanoStatus() {
   try {
     const LM = window.LanguageModel;
     if (!LM || typeof LM.availability !== "function") {
-      el.textContent = "On-device AI (Gemini Nano): not supported in this browser (needs Chrome 138+).";
+      el.textContent = "On-device AI (Gemini Nano): not supported in this browser (needs Chrome 139+).";
       return;
     }
     const raw = await LM.availability();
+    // Prompt API values are "readily" | "after-download" | "no"
+    // ("available"/"downloadable" kept as legacy tolerance only).
     const state = typeof raw === "string" ? raw : raw?.available ?? raw;
-    if (state === "available" || state === "readily") {
+    if (state === "readily" || state === "available") {
       el.textContent = "On-device AI (Gemini Nano): ready on this browser.";
-    } else if (state === "downloading" || state === "downloadable" || state === "after-download") {
+    } else if (state === "after-download" || state === "downloadable" || state === "downloading") {
       el.textContent =
         "On-device AI (Gemini Nano): model downloading in the background — run Verify, then try again in a few minutes.";
     } else {
@@ -204,23 +206,38 @@ async function runVerify() {
     setProgress("Fetching on-chain data…");
     const result = await verifyContract(address, setProgress);
 
-    // Agent ID identity check runs alongside the contract check when the
-    // minter's handle + wallet are filled in. It never changes the
-    // deterministic verdict — it is a separate reputation signal.
+    // Deterministic results render FIRST — an Agent ID hang/failure must
+    // never block them (spec: deterministic checks are always shown).
+    // The Agent ID check runs after, then re-renders with its result.
+    setProgress("");
+    renderResults(result, null, null, aiAvailable());
+
+    // Agent ID identity check runs when the minter's handle + wallet are
+    // filled in. It never changes the deterministic verdict — it is a
+    // separate reputation signal.
     let agentId = null;
     if ($("agentHandle").value.trim() && $("agentWallet").value.trim()) {
       try {
         agentId = await verifyAgentId($("agentHandle").value.trim(), $("agentWallet").value.trim());
         renderAgentResult(agentId);
         result.agentId = agentId;
+        renderResults(result, null, null, aiAvailable());
       } catch (err) {
+        // Invalid handle/address throws: show it in the panel, not just
+        // in the console — the user otherwise gets no feedback at all.
         console.warn("[MintGuard] Agent ID check failed:", err);
+        agentId = {
+          verified: false,
+          status: "error",
+          detail: `Agent ID check failed: ${err.message || err}`,
+          registeredHandle: "",
+          walletAddress: $("agentWallet").value.trim(),
+        };
+        renderAgentResult(agentId);
+        result.agentId = agentId;
+        renderResults(result, null, null, aiAvailable());
       }
     }
-
-    // Deterministic results render FIRST — an AI hang must never block them.
-    setProgress("");
-    renderResults(result, null, null, aiAvailable());
 
     let ai = null;
     let aiError = null;
