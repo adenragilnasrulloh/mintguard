@@ -90,6 +90,40 @@
 
         <section id="results" class="results hidden" aria-live="polite"></section>
 
+        <section class="agentid card">
+          <h2>Agent ID check</h2>
+          <p>
+            MintGuard uses Binance Agent ID as the minter's identity layer: it
+            reads the Agent ID registry on BSC to confirm the wallet checking
+            a mint actually owns the Agent ID it claims. A verified Agent ID
+            is a reputation signal — a mismatch or no Agent ID is a warning,
+            not a pass.
+          </p>
+          <label for="agentHandle">Agent ID handle</label>
+          <div class="input-row">
+            <input
+              id="agentHandle"
+              type="text"
+              spellcheck="false"
+              autocomplete="off"
+              placeholder="astrajingga0704"
+            />
+            <input
+              id="agentWallet"
+              type="text"
+              spellcheck="false"
+              autocomplete="off"
+              placeholder="Wallet address 0x…"
+            />
+            <button id="agentCheckBtn" type="button">Check Agent ID</button>
+          </div>
+          <p class="hint">
+            Read-only on-chain lookup (registry
+            <code>0x60B9…22F</code>). No wallet connection, no transaction, no signing.
+          </p>
+          <div id="agentResult" class="agent-result hidden" role="status"></div>
+        </section>
+
         <section class="how card">
           <h2>How it works</h2>
           <ol>

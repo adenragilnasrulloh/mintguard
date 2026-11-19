@@ -94,10 +94,34 @@ body {
   margin-top: 20px;
 }
 
-.verifier label {
+.verifier label,
+.agentid label {
   display: block;
   font-weight: 600;
   margin-bottom: 8px;
+}
+
+.agentid label {
+  margin-top: 12px;
+}
+
+.agentid #agentCheckBtn {
+  padding: 12px 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #06281c;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.agent-result {
+  margin-top: 14px;
+  line-height: 1.5;
+}
+
+.agent-result .badge {
+  margin-right: 6px;
 }
 
 .input-row {

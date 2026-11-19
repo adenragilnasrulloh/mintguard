@@ -11,6 +11,25 @@ MintGuard checks a BSC NFT contract **before you mint it**. Paste a contract add
 
 No wallet connection. No transaction. No signing. Free to check.
 
+## Agent ID integration (Agent ID Hackathon)
+
+MintGuard uses Binance Agent ID as the minter's identity and reputation
+layer. In the **Agent ID check** panel, enter an Agent ID handle (e.g.
+`astrajingga0704`) and a wallet address: MintGuard calls the Agent ID
+HandleRegistry on BSC (`0x60B9262456dE011F7d15a54CdD8c48bAaa8B022F`,
+`handleOf(address)`) and reports one of:
+
+- **Verified** — the wallet owns that Agent ID on-chain.
+- **Mismatch** — the wallet owns a different Agent ID than claimed.
+- **No Agent ID** — the wallet has no Agent ID registered.
+
+The check is read-only, runs alongside the contract verification when
+both fields are filled, and never changes the deterministic risk verdict —
+it is a separate reputation signal. Verified on-chain for the demo
+identity: `handleOf(0x822854cfDb5A8a8e57e62F0F2214D8d974D4B562)` returns
+`astrajingga0704`, and `ownerOf(keccak256("astrajingga0704"))` returns the
+same wallet. See `src/agentid.js`.
+
 ## How hybrid inference works
 
 - The app calls `model.initializeDeviceModel()` from the **Verify** click handler, then `generateContent()` with the verified on-chain facts and a strict JSON `responseSchema` (`verdict`, `riskScore`, `redFlags`, `summary`).

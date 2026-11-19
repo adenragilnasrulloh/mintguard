@@ -1,4 +1,5 @@
 import { verifyContract, isValidAddress } from "./verifier.js";
+import { verifyAgentId, normalizeHandle } from "./agentid.js";
 import { onVerify, aiAvailable } from "./ai.js";
 import { firebaseConfigured } from "./firebase.js";
 import "./styles.css";
@@ -19,6 +20,48 @@ function setError(text) {
   errorEl.textContent = text || "";
   errorEl.classList.toggle("hidden", !text);
 }
+
+function renderAgentResult(result) {
+  const el = $("agentResult");
+  if (!el) return;
+  const cls = result.verified ? "safe" : result.status === "mismatch" ? "dangerous" : "caution";
+  const label = result.verified
+    ? "Agent ID verified"
+    : result.status === "mismatch"
+      ? "Agent ID mismatch"
+      : result.status === "no-agent-id"
+        ? "No Agent ID"
+        : "Agent ID check failed";
+  el.innerHTML = `<span class="badge ${cls}">${esc(label)}</span> <span>${esc(result.detail)}</span>`;
+  el.classList.remove("hidden");
+  el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+async function runAgentCheck() {
+  const handle = $("agentHandle").value.trim();
+  const wallet = $("agentWallet").value.trim();
+  const el = $("agentResult");
+  if (!handle || !wallet) {
+    if (el) {
+      el.innerHTML = "Enter both an Agent ID handle and a wallet address to check.";
+      el.classList.remove("hidden");
+    }
+    return null;
+  }
+  try {
+    const result = await verifyAgentId(handle, wallet);
+    renderAgentResult(result);
+    return result;
+  } catch (err) {
+    if (el) {
+      el.innerHTML = `<span class="badge caution">Agent ID check failed</span> <span>${esc(err.message || err)}</span>`;
+      el.classList.remove("hidden");
+    }
+    return null;
+  }
+}
+
+$("agentCheckBtn")?.addEventListener("click", runAgentCheck);
 
 function verdictClass(v) {
   return v === "SAFE" ? "safe" : v === "DANGEROUS" ? "dangerous" : "caution";
@@ -78,7 +121,7 @@ async function probeNanoStatus() {
 
 probeNanoStatus();
 
-function renderResults({ facts, checks, riskScore, verdict }, ai, aiError, aiPending = false) {
+function renderResults({ facts, checks, riskScore, verdict, agentId }, ai, aiError, aiPending = false) {
   const finalVerdict = ai?.verdict || verdict;
   const finalScore = ai?.riskScore ?? riskScore;
   const flags = ai?.redFlags || [];
@@ -95,6 +138,11 @@ function renderResults({ facts, checks, riskScore, verdict }, ai, aiError, aiPen
         </div>
       </div>
       <p class="address-line"><code>${esc(facts.address)}</code> · BSC 56</p>
+      ${
+        agentId
+          ? `<p class="address-line">Agent ID: <strong>${esc(agentId.verified ? "verified" : agentId.status)}</strong> — ${esc(agentId.registeredHandle ? `${agentId.registeredHandle}.ai` : "none")} for <code>${esc(agentId.walletAddress)}</code></p>`
+          : ""
+      }
       ${
         ai
           ? `<p class="ai-summary">${esc(ai.summary)}</p>
@@ -155,6 +203,20 @@ async function runVerify() {
   try {
     setProgress("Fetching on-chain data…");
     const result = await verifyContract(address, setProgress);
+
+    // Agent ID identity check runs alongside the contract check when the
+    // minter's handle + wallet are filled in. It never changes the
+    // deterministic verdict — it is a separate reputation signal.
+    let agentId = null;
+    if ($("agentHandle").value.trim() && $("agentWallet").value.trim()) {
+      try {
+        agentId = await verifyAgentId($("agentHandle").value.trim(), $("agentWallet").value.trim());
+        renderAgentResult(agentId);
+        result.agentId = agentId;
+      } catch (err) {
+        console.warn("[MintGuard] Agent ID check failed:", err);
+      }
+    }
 
     // Deterministic results render FIRST — an AI hang must never block them.
     setProgress("");
